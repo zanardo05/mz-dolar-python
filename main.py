@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os
 
 app = FastAPI()
 
@@ -14,13 +13,14 @@ app.add_middleware(
 )
 
 FRONTEND_URL = "https://mz-dolar.vercel.app"
+
 APP_ID = "1089"
 
 @app.get("/")
 def home():
+
     return {
-        "status": "online",
-        "api": "MZ Dólar Python Backend"
+        "status": "online"
     }
 
 # LOGIN DERIV
@@ -37,6 +37,8 @@ def login_deriv():
         f"&redirect_uri={redirect_uri}"
     )
 
+    print("LOGIN URL:", oauth_url)
+
     return RedirectResponse(oauth_url)
 
 # CALLBACK
@@ -45,14 +47,18 @@ def callback(code: str = None):
 
     print("CODE:", code)
 
+    # DEBUG
     if not code:
+
         return {
-            "error": "OAuth code não encontrado"
+            "erro": "OAuth code não encontrado"
         }
 
     # volta para frontend
     redirect = (
         f"{FRONTEND_URL}/#/dashboard?code={code}"
     )
+
+    print("REDIRECT:", redirect)
 
     return RedirectResponse(redirect)
