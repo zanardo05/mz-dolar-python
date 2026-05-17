@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import secrets
 import hashlib
 import base64
+import requests
 
 app = FastAPI()
 
@@ -16,12 +17,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# OAuth Client ID Deriv
 CLIENT_ID = "33i32GbNdYrf99M2AM24V"
 
+# Frontend
 FRONTEND_URL = (
     "https://mz-dolar.vercel.app"
 )
 
+# Callback Render
 REDIRECT_URI = (
     "https://mz-dolar-python.onrender.com/auth/callback"
 )
@@ -50,10 +54,11 @@ def generate_pkce():
 def home():
 
     return {
-        "status": "online"
+        "status": "online",
+        "api": "MZ Dólar Python Backend"
     }
 
-# LOGIN
+# LOGIN DERIV
 @app.get("/auth/login")
 def login():
 
@@ -72,11 +77,13 @@ def login():
         f"&code_challenge_method=S256"
     )
 
+    print("AUTH URL:", auth_url)
+
     return RedirectResponse(
         auth_url
     )
 
-# CALLBACK
+# CALLBACK DERIV
 @app.get("/auth/callback")
 def callback(
     code: str = None,
@@ -91,9 +98,41 @@ def callback(
             "erro": "OAuth code não encontrado"
         }
 
-    redirect = (
-        f"{FRONTEND_URL}/#/dashboard?code={code}"
+    # troca code por access_token
+    token_url = (
+        "https://api.deriv.com/oauth2/token"
     )
+
+    payload = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "client_id": CLIENT_ID,
+        "redirect_uri": REDIRECT_URI,
+    }
+
+    response = requests.post(
+        token_url,
+        data=payload
+    )
+
+    data = response.json()
+
+    print("TOKEN RESPONSE:", data)
+
+    access_token = data.get(
+        "access_token"
+    )
+
+    if not access_token:
+
+        return data
+
+    # volta para frontend
+    redirect = (
+        f"{FRONTEND_URL}/#/dashboard?token={access_token}"
+    )
+
+    print("REDIRECT:", redirect)
 
     return RedirectResponse(
         redirect
