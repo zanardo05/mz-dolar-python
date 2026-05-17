@@ -6,6 +6,8 @@ import secrets
 import hashlib
 import base64
 import requests
+import websocket
+import json
 
 app = FastAPI()
 
@@ -104,7 +106,7 @@ def callback(
                 "erro": "Code verifier não encontrado"
             }
 
-        # troca code por access_token
+        # troca code por OAuth access token
         token_url = (
             "https://auth.deriv.com/oauth2/token"
         )
@@ -126,54 +128,70 @@ def callback(
 
         print("OAUTH:", oauth_data)
 
-        access_token = oauth_data.get(
+        oauth_token = oauth_data.get(
             "access_token"
         )
 
-        if not access_token:
+        if not oauth_token:
 
             return oauth_data
 
-        # cria token websocket REAL
-        new_token_url = (
-            "https://api.deriv.com/api-explorer/#new_token"
+        # websocket deriv
+        ws = websocket.create_connection(
+            "wss://ws.derivws.com/websockets/v3"
         )
 
-        headers = {
-            "Authorization":
-            f"Bearer {access_token}"
-        }
-
-        token_payload = {
-            "name": "MZDollarWS",
-            "scopes": [
-                "read",
-                "trade"
-            ]
-        }
-
-        token_response = requests.post(
-            "https://api.deriv.com/user/token",
-            json=token_payload,
-            headers=headers
+        # authorize oauth
+        ws.send(
+            json.dumps({
+                "authorize": oauth_token
+            })
         )
 
-        token_data = (
-            token_response.json()
+        auth_response = json.loads(
+            ws.recv()
         )
 
         print(
-            "WS TOKEN:",
-            token_data
+            "AUTH RESPONSE:",
+            auth_response
         )
 
-        ws_token = token_data.get(
-            "token"
+        if auth_response.get("error"):
+
+            return auth_response
+
+        # cria token websocket
+        ws.send(
+            json.dumps({
+                "new_token": 1,
+                "new_token_scopes": [
+                    "read",
+                    "trade"
+                ],
+                "new_token_name":
+                    "MZDollarWS"
+            })
+        )
+
+        token_response = json.loads(
+            ws.recv()
+        )
+
+        print(
+            "TOKEN RESPONSE:",
+            token_response
+        )
+
+        ws_token = (
+            token_response
+            .get("new_token", {})
+            .get("token")
         )
 
         if not ws_token:
 
-            return token_data
+            return token_response
 
         redirect = (
             f"{FRONTEND_URL}"
