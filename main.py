@@ -121,7 +121,7 @@ def callback(
             }
 
         token_url = (
-            "https://api.deriv.com/oauth2/token"
+            "https://auth.deriv.com/oauth2/token"
         )
 
         payload = {
