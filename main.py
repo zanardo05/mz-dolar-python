@@ -28,7 +28,7 @@ def home():
 def login_deriv():
 
     redirect_uri = (
-        "https://mz-dolar-python.onrender.com/auth/callback"
+        "https://mz-dolar.vercel.app"
     )
 
     oauth_url = (
