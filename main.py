@@ -57,13 +57,9 @@ def home():
 @app.get("/auth/login")
 def login():
 
-    state =
-        secrets.token_urlsafe(16)
+    state = secrets.token_urlsafe(16)
 
-    (
-        code_verifier,
-        code_challenge
-    ) = generate_pkce()
+    code_verifier, code_challenge = generate_pkce()
 
     auth_url = (
         "https://auth.deriv.com/oauth2/auth"
