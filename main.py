@@ -19,19 +19,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# OAuth Client ID
 CLIENT_ID = "33i32GbNdYrf99M2AM24V"
 
+# APP ID NUMÉRICO DO WEBSOCKET
+APP_ID = "74231"  # TROQUE PELO SEU
+
+# FRONTEND
 FRONTEND_URL = (
     "https://mz-dolar.vercel.app"
 )
 
+# CALLBACK
 REDIRECT_URI = (
     "https://mz-dolar-python.onrender.com/auth/callback"
 )
 
+# armazenamento PKCE
 pkce_storage = {}
 
-# PKCE
+# gera PKCE
 def generate_pkce():
 
     code_verifier = (
@@ -42,9 +49,12 @@ def generate_pkce():
         code_verifier.encode()
     ).digest()
 
-    code_challenge = base64.urlsafe_b64encode(
-        challenge
-    ).decode().replace("=", "")
+    code_challenge = (
+        base64
+        .urlsafe_b64encode(challenge)
+        .decode()
+        .replace("=", "")
+    )
 
     return (
         code_verifier,
@@ -55,18 +65,26 @@ def generate_pkce():
 def home():
 
     return {
-        "status": "online"
+        "status": "online",
+        "api": "MZ Dólar Backend"
     }
 
-# LOGIN
+# LOGIN DERIV
 @app.get("/auth/login")
 def login():
 
-    state = secrets.token_urlsafe(16)
+    state = (
+        secrets.token_urlsafe(16)
+    )
 
-    code_verifier, code_challenge = generate_pkce()
+    code_verifier, code_challenge = (
+        generate_pkce()
+    )
 
-    pkce_storage[state] = code_verifier
+    # salva verifier
+    pkce_storage[state] = (
+        code_verifier
+    )
 
     auth_url = (
         "https://auth.deriv.com/oauth2/auth"
@@ -79,11 +97,16 @@ def login():
         f"&code_challenge_method=S256"
     )
 
+    print(
+        "AUTH URL:",
+        auth_url
+    )
+
     return RedirectResponse(
         auth_url
     )
 
-# CALLBACK
+# CALLBACK DERIV
 @app.get("/auth/callback")
 def callback(
     code: str = None,
@@ -92,31 +115,43 @@ def callback(
 
     try:
 
+        print("CODE:", code)
+        print("STATE:", state)
+
         if not code:
 
             return {
-                "erro": "OAuth code não encontrado"
+                "erro":
+                "OAuth code não encontrado"
             }
 
-        code_verifier = pkce_storage.get(state)
+        code_verifier = (
+            pkce_storage.get(state)
+        )
 
         if not code_verifier:
 
             return {
-                "erro": "Code verifier não encontrado"
+                "erro":
+                "Code verifier não encontrado"
             }
 
-        # troca code por OAuth access token
+        # troca code por access_token
         token_url = (
             "https://auth.deriv.com/oauth2/token"
         )
 
         payload = {
-            "grant_type": "authorization_code",
-            "code": code,
-            "client_id": CLIENT_ID,
-            "redirect_uri": REDIRECT_URI,
-            "code_verifier": code_verifier
+            "grant_type":
+                "authorization_code",
+            "code":
+                code,
+            "client_id":
+                CLIENT_ID,
+            "redirect_uri":
+                REDIRECT_URI,
+            "code_verifier":
+                code_verifier
         }
 
         response = requests.post(
@@ -124,12 +159,19 @@ def callback(
             data=payload
         )
 
-        oauth_data = response.json()
+        oauth_data = (
+            response.json()
+        )
 
-        print("OAUTH:", oauth_data)
+        print(
+            "OAUTH DATA:",
+            oauth_data
+        )
 
-        oauth_token = oauth_data.get(
-            "access_token"
+        oauth_token = (
+            oauth_data.get(
+                "access_token"
+            )
         )
 
         if not oauth_token:
@@ -138,18 +180,21 @@ def callback(
 
         # websocket deriv
         ws = websocket.create_connection(
-            "wss://ws.derivws.com/websockets/v3"
+            f"wss://ws.derivws.com/websockets/v3?app_id={APP_ID}"
         )
 
-        # authorize oauth
+        # authorize oauth token
         ws.send(
             json.dumps({
-                "authorize": oauth_token
+                "authorize":
+                    oauth_token
             })
         )
 
-        auth_response = json.loads(
-            ws.recv()
+        auth_response = (
+            json.loads(
+                ws.recv()
+            )
         )
 
         print(
@@ -161,7 +206,7 @@ def callback(
 
             return auth_response
 
-        # cria token websocket
+        # cria token websocket REAL
         ws.send(
             json.dumps({
                 "new_token": 1,
@@ -174,8 +219,10 @@ def callback(
             })
         )
 
-        token_response = json.loads(
-            ws.recv()
+        token_response = (
+            json.loads(
+                ws.recv()
+            )
         )
 
         print(
@@ -193,9 +240,15 @@ def callback(
 
             return token_response
 
+        # redireciona frontend
         redirect = (
             f"{FRONTEND_URL}"
             f"/#/dashboard?token={ws_token}"
+        )
+
+        print(
+            "REDIRECT:",
+            redirect
         )
 
         return RedirectResponse(
@@ -204,7 +257,10 @@ def callback(
 
     except Exception as e:
 
-        print(str(e))
+        print(
+            "ERRO:",
+            str(e)
+        )
 
         return {
             "erro": str(e)
