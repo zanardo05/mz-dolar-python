@@ -17,18 +17,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# OAuth Client ID Deriv
 CLIENT_ID = "33i32GbNdYrf99M2AM24V"
 
-# Frontend
 FRONTEND_URL = (
     "https://mz-dolar.vercel.app"
 )
 
-# Callback Render
 REDIRECT_URI = (
     "https://mz-dolar-python.onrender.com/auth/callback"
 )
+
+# memória temporária
+pkce_storage = {}
 
 # PKCE
 def generate_pkce():
@@ -58,13 +58,16 @@ def home():
         "api": "MZ Dólar Python Backend"
     }
 
-# LOGIN DERIV
+# LOGIN
 @app.get("/auth/login")
 def login():
 
     state = secrets.token_urlsafe(16)
 
     code_verifier, code_challenge = generate_pkce()
+
+    # salva verifier
+    pkce_storage[state] = code_verifier
 
     auth_url = (
         "https://auth.deriv.com/oauth2/auth"
@@ -77,20 +80,16 @@ def login():
         f"&code_challenge_method=S256"
     )
 
-    print("AUTH URL:", auth_url)
-
     return RedirectResponse(
         auth_url
     )
 
-# CALLBACK DERIV
+# CALLBACK
 @app.get("/auth/callback")
 def callback(
     code: str = None,
     state: str = None
 ):
-
-    print("CODE:", code)
 
     if not code:
 
@@ -98,7 +97,14 @@ def callback(
             "erro": "OAuth code não encontrado"
         }
 
-    # troca code por access_token
+    code_verifier = pkce_storage.get(state)
+
+    if not code_verifier:
+
+        return {
+            "erro": "Code verifier não encontrado"
+        }
+
     token_url = (
         "https://api.deriv.com/oauth2/token"
     )
@@ -108,6 +114,7 @@ def callback(
         "code": code,
         "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
+        "code_verifier": code_verifier
     }
 
     response = requests.post(
@@ -117,7 +124,7 @@ def callback(
 
     data = response.json()
 
-    print("TOKEN RESPONSE:", data)
+    print(data)
 
     access_token = data.get(
         "access_token"
@@ -127,12 +134,9 @@ def callback(
 
         return data
 
-    # volta para frontend
     redirect = (
         f"{FRONTEND_URL}/#/dashboard?token={access_token}"
     )
-
-    print("REDIRECT:", redirect)
 
     return RedirectResponse(
         redirect
