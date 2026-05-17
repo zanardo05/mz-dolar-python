@@ -17,23 +17,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# OAuth Client ID Deriv
 CLIENT_ID = "33i32GbNdYrf99M2AM24V"
 
-# Frontend
 FRONTEND_URL = (
     "https://mz-dolar.vercel.app"
 )
 
-# Callback Render
 REDIRECT_URI = (
     "https://mz-dolar-python.onrender.com/auth/callback"
 )
 
-# Memória temporária PKCE
 pkce_storage = {}
 
-# Gera PKCE
+# PKCE
 def generate_pkce():
 
     code_verifier = (
@@ -57,11 +53,10 @@ def generate_pkce():
 def home():
 
     return {
-        "status": "online",
-        "api": "MZ Dólar Python Backend"
+        "status": "online"
     }
 
-# LOGIN DERIV
+# LOGIN
 @app.get("/auth/login")
 def login():
 
@@ -69,7 +64,6 @@ def login():
 
     code_verifier, code_challenge = generate_pkce()
 
-    # salva verifier
     pkce_storage[state] = code_verifier
 
     auth_url = (
@@ -83,13 +77,11 @@ def login():
         f"&code_challenge_method=S256"
     )
 
-    print("AUTH URL:", auth_url)
-
     return RedirectResponse(
         auth_url
     )
 
-# CALLBACK DERIV
+# CALLBACK
 @app.get("/auth/callback")
 def callback(
     code: str = None,
@@ -97,9 +89,6 @@ def callback(
 ):
 
     try:
-
-        print("CODE:", code)
-        print("STATE:", state)
 
         if not code:
 
@@ -109,17 +98,13 @@ def callback(
 
         code_verifier = pkce_storage.get(state)
 
-        print(
-            "CODE VERIFIER:",
-            code_verifier
-        )
-
         if not code_verifier:
 
             return {
                 "erro": "Code verifier não encontrado"
             }
 
+        # troca code por access_token
         token_url = (
             "https://auth.deriv.com/oauth2/token"
         )
@@ -132,58 +117,67 @@ def callback(
             "code_verifier": code_verifier
         }
 
-        print(
-            "PAYLOAD:",
-            payload
-        )
-
         response = requests.post(
             token_url,
             data=payload
         )
 
-        print(
-            "STATUS:",
-            response.status_code
-        )
+        oauth_data = response.json()
 
-        print(
-            "TEXT:",
-            response.text
-        )
+        print("OAUTH:", oauth_data)
 
-        try:
-
-            data = response.json()
-
-        except Exception:
-
-            return {
-                "erro": "Resposta não JSON",
-                "texto": response.text
-            }
-
-        print(
-            "JSON:",
-            data
-        )
-
-        access_token = data.get(
+        access_token = oauth_data.get(
             "access_token"
         )
 
         if not access_token:
 
-            return data
+            return oauth_data
 
-        # volta para frontend
-        redirect = (
-            f"{FRONTEND_URL}/#/dashboard?token={access_token}"
+        # cria token websocket REAL
+        new_token_url = (
+            "https://api.deriv.com/api-explorer/#new_token"
+        )
+
+        headers = {
+            "Authorization":
+            f"Bearer {access_token}"
+        }
+
+        token_payload = {
+            "name": "MZDollarWS",
+            "scopes": [
+                "read",
+                "trade"
+            ]
+        }
+
+        token_response = requests.post(
+            "https://api.deriv.com/user/token",
+            json=token_payload,
+            headers=headers
+        )
+
+        token_data = (
+            token_response.json()
         )
 
         print(
-            "REDIRECT:",
-            redirect
+            "WS TOKEN:",
+            token_data
+        )
+
+        ws_token = token_data.get(
+            "token"
+        )
+
+        if not ws_token:
+
+            return token_data
+
+        redirect = (
+            f"{FRONTEND_URL}"
+            f"/#/dashboard?token={ws_token}"
         )
 
         return RedirectResponse(
@@ -192,10 +186,7 @@ def callback(
 
     except Exception as e:
 
-        print(
-            "ERRO:",
-            str(e)
-        )
+        print(str(e))
 
         return {
             "erro": str(e)
