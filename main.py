@@ -17,20 +17,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# OAuth Client ID Deriv
 CLIENT_ID = "33i32GbNdYrf99M2AM24V"
 
+# Frontend
 FRONTEND_URL = (
     "https://mz-dolar.vercel.app"
 )
 
+# Callback Render
 REDIRECT_URI = (
     "https://mz-dolar-python.onrender.com/auth/callback"
 )
 
-# memória temporária
+# Memória temporária PKCE
 pkce_storage = {}
 
-# PKCE
+# Gera PKCE
 def generate_pkce():
 
     code_verifier = (
@@ -58,7 +61,7 @@ def home():
         "api": "MZ Dólar Python Backend"
     }
 
-# LOGIN
+# LOGIN DERIV
 @app.get("/auth/login")
 def login():
 
@@ -80,64 +83,120 @@ def login():
         f"&code_challenge_method=S256"
     )
 
+    print("AUTH URL:", auth_url)
+
     return RedirectResponse(
         auth_url
     )
 
-# CALLBACK
+# CALLBACK DERIV
 @app.get("/auth/callback")
 def callback(
     code: str = None,
     state: str = None
 ):
 
-    if not code:
+    try:
 
-        return {
-            "erro": "OAuth code não encontrado"
+        print("CODE:", code)
+        print("STATE:", state)
+
+        if not code:
+
+            return {
+                "erro": "OAuth code não encontrado"
+            }
+
+        code_verifier = pkce_storage.get(state)
+
+        print(
+            "CODE VERIFIER:",
+            code_verifier
+        )
+
+        if not code_verifier:
+
+            return {
+                "erro": "Code verifier não encontrado"
+            }
+
+        token_url = (
+            "https://api.deriv.com/oauth2/token"
+        )
+
+        payload = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "client_id": CLIENT_ID,
+            "redirect_uri": REDIRECT_URI,
+            "code_verifier": code_verifier
         }
 
-    code_verifier = pkce_storage.get(state)
+        print(
+            "PAYLOAD:",
+            payload
+        )
 
-    if not code_verifier:
+        response = requests.post(
+            token_url,
+            data=payload
+        )
+
+        print(
+            "STATUS:",
+            response.status_code
+        )
+
+        print(
+            "TEXT:",
+            response.text
+        )
+
+        try:
+
+            data = response.json()
+
+        except Exception:
+
+            return {
+                "erro": "Resposta não JSON",
+                "texto": response.text
+            }
+
+        print(
+            "JSON:",
+            data
+        )
+
+        access_token = data.get(
+            "access_token"
+        )
+
+        if not access_token:
+
+            return data
+
+        # volta para frontend
+        redirect = (
+            f"{FRONTEND_URL}/#/dashboard?token={access_token}"
+        )
+
+        print(
+            "REDIRECT:",
+            redirect
+        )
+
+        return RedirectResponse(
+            redirect
+        )
+
+    except Exception as e:
+
+        print(
+            "ERRO:",
+            str(e)
+        )
 
         return {
-            "erro": "Code verifier não encontrado"
+            "erro": str(e)
         }
-
-    token_url = (
-        "https://api.deriv.com/oauth2/token"
-    )
-
-    payload = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "client_id": CLIENT_ID,
-        "redirect_uri": REDIRECT_URI,
-        "code_verifier": code_verifier
-    }
-
-    response = requests.post(
-        token_url,
-        data=payload
-    )
-
-    data = response.json()
-
-    print(data)
-
-    access_token = data.get(
-        "access_token"
-    )
-
-    if not access_token:
-
-        return data
-
-    redirect = (
-        f"{FRONTEND_URL}/#/dashboard?token={access_token}"
-    )
-
-    return RedirectResponse(
-        redirect
-    )
