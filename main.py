@@ -14,7 +14,7 @@ app.add_middleware(
 
 FRONTEND_URL = "https://mz-dolar.vercel.app"
 
-APP_ID = "1089"
+APP_ID = "33i32GbNdYrf99M2AM24V"
 
 @app.get("/")
 def home():
