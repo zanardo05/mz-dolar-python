@@ -22,8 +22,8 @@ app.add_middleware(
 # OAuth Client ID
 CLIENT_ID = "33i32GbNdYrf99M2AM24V"
 
-# APP ID NUMÉRICO DO WEBSOCKET
-APP_ID = "74231"  # TROQUE PELO SEU
+# APP ID websocket
+APP_ID = "74231"  # TROQUE PELO SEU APP ID NUMÉRICO
 
 # FRONTEND
 FRONTEND_URL = (
@@ -37,6 +37,9 @@ REDIRECT_URI = (
 
 # armazenamento PKCE
 pkce_storage = {}
+
+# sessão OAuth
+deriv_oauth_token = None
 
 # gera PKCE
 def generate_pkce():
@@ -81,7 +84,6 @@ def login():
         generate_pkce()
     )
 
-    # salva verifier
     pkce_storage[state] = (
         code_verifier
     )
@@ -97,11 +99,6 @@ def login():
         f"&code_challenge_method=S256"
     )
 
-    print(
-        "AUTH URL:",
-        auth_url
-    )
-
     return RedirectResponse(
         auth_url
     )
@@ -114,9 +111,6 @@ def callback(
 ):
 
     try:
-
-        print("CODE:", code)
-        print("STATE:", state)
 
         if not code:
 
@@ -164,7 +158,7 @@ def callback(
         )
 
         print(
-            "OAUTH DATA:",
+            "OAUTH:",
             oauth_data
         )
 
@@ -178,16 +172,46 @@ def callback(
 
             return oauth_data
 
-        # websocket deriv
+        # salva sessão OAuth
+        global deriv_oauth_token
+        deriv_oauth_token = oauth_token
+
+        return RedirectResponse(
+            f"{FRONTEND_URL}/#/dashboard"
+        )
+
+    except Exception as e:
+
+        print(str(e))
+
+        return {
+            "erro": str(e)
+        }
+
+# SALDO DERIV
+@app.get("/balance")
+def balance():
+
+    try:
+
+        global deriv_oauth_token
+
+        if not deriv_oauth_token:
+
+            return {
+                "erro":
+                "Usuário não autenticado"
+            }
+
         ws = websocket.create_connection(
             f"wss://ws.derivws.com/websockets/v3?app_id={APP_ID}"
         )
 
-        # authorize oauth token
+        # authorize
         ws.send(
             json.dumps({
                 "authorize":
-                    oauth_token
+                    deriv_oauth_token
             })
         )
 
@@ -198,7 +222,7 @@ def callback(
         )
 
         print(
-            "AUTH RESPONSE:",
+            "AUTH:",
             auth_response
         )
 
@@ -206,61 +230,29 @@ def callback(
 
             return auth_response
 
-        # cria token websocket REAL
+        # balance
         ws.send(
             json.dumps({
-                "new_token": 1,
-                "new_token_scopes": [
-                    "read",
-                    "trade"
-                ],
-                "new_token_name":
-                    "MZDollarWS"
+                "balance": 1
             })
         )
 
-        token_response = (
+        balance_response = (
             json.loads(
                 ws.recv()
             )
         )
 
         print(
-            "TOKEN RESPONSE:",
-            token_response
+            "BALANCE:",
+            balance_response
         )
 
-        ws_token = (
-            token_response
-            .get("new_token", {})
-            .get("token")
-        )
-
-        if not ws_token:
-
-            return token_response
-
-        # redireciona frontend
-        redirect = (
-            f"{FRONTEND_URL}"
-            f"/#/dashboard?token={ws_token}"
-        )
-
-        print(
-            "REDIRECT:",
-            redirect
-        )
-
-        return RedirectResponse(
-            redirect
-        )
+        return balance_response
 
     except Exception as e:
 
-        print(
-            "ERRO:",
-            str(e)
-        )
+        print(str(e))
 
         return {
             "erro": str(e)
